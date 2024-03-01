@@ -1,0 +1,74 @@
+    16 // handshake record type
+    0303 // tlsplaintext legacy version
+    00ff // record length
+
+    01 // handshake type clienthello
+    0000fb // u24 handshake packet length
+
+    0303 // legacy_version
+!    cb34ecb1e78163ba1c38c6dacb196a6dffa21a8d9912ec18a2ef6283024dece7 // random
+    00 // legacy session id
+    0002 // len(ciphersuites)
+    1301 // AES_128_GCM_SHA256
+    01 // legacy_compression_methods (len)
+    00 // legacy_compression_methods (no compression)
+   00d0 // extensions length
+
+    000a // extensiontype supported_groups
+    0004 // supported_groups len
+    0002 // named_group_list len
+    001d // x25519
+
+    0033 // extensiontype key_share 
+    0026 // key_share len
+    0024 // client_shares len
+    001d // NamedGroup x25519
+    0020 // x25519 share len
+    99381de560e4bd43d23d8e435a7dbafeb3c06e51c13cae4d5413691e529aaf2c // x25519 share
+
+    002b // extensiontype supported_versions
+    0003 // supported_versions len
+    02   // supported_versions versions len
+    0304 // tls 1.3
+
+    000d // extensiontype signature_algorithms
+    0014 // signature_algorithms len
+    0012 // supported_signature_algorithms len
+    0403 // ecdsa_secp256r1_sha256
+    0503 // ecdsa_secp384r1_sha384
+    0603 // ecdsa_secp521r1_sha512
+    0804 // rsa_pss_rsae_sha256
+    0805 // rsa_pss_rsae_sha384
+    0806 // rsa_pss_rsae_sha512
+    0401 // rsa_pkcs1_sha256
+    0501 // rsa_pkcs1_sha384
+    0601 // rsa_pkcs1_sha512
+
+    0000 // extensiontype 0 = sni
+    !    000b // sni len
+    !    0009 // servernamelist len
+        00  // servername type (0 = hostname)
+    !    0006 // servername length
+    !    736572766572 // servername (utf-8 "server")
+
+    0015
+    0000
+    // many zeroes
+
+
+
+    0016
+    000c
+    000a //
+    0008 // alpn string len
+    687474702f312e31 // http/1.1
+
+    Extension: application_layer_protocol_negotiation (len=14)
+    Type: application_layer_protocol_negotiation (16)
+    Length: 14
+    ALPN Extension Length: 12
+    ALPN Protocol
+        ALPN string length: 2
+        ALPN Next Protocol: h2
+        ALPN string length: 8
+        ALPN Next Protocol: http/1.1

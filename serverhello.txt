@@ -1,0 +1,22 @@
+16 // handshake record type
+0303 // handshake record legacy_version
+005a // handshake record len
+
+02 // serverhello
+000056 // u24 serverhello len
+0303 // legacy_version
+a6af06a4121860dc5e6e60249cd34c95930c8ac5cb1434dac155772ed3e26928 // server random
+00 // legacy_session_id_echo len
+1301 // CipherSuite AES_128_GCM_SHA256
+00 // legacy_compression_method = 0
+002e // extensions length
+
+0033 // extensiontype key_share 
+0024 // key_share len
+001d // NamedGroup
+0020 // key_exchange len
+c9828876112095fe66762bdbf7c672e156d6cc253b833df1dd69b1b04e751f0f // server keyshare
+
+002b // supported_versions
+0002 // supported_versions len
+0304 // tls 1.3
