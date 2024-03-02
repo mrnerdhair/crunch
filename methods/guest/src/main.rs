@@ -11,6 +11,7 @@ fn main() {
     let input: u32 = env::read();
 
     // TODO: do something with the input
+    crunch::main();
 
     // write public output to the journal
     env::commit(&input);

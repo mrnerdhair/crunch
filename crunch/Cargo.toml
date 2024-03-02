@@ -5,11 +5,15 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["cli"]
+cli = ["dep:env_logger"]
+
 [dependencies]
 aes-gcm = "0.10.3"
 block-buffer = "0.10.4"
 der = "0.7.8"
-env_logger = "0.11.2"
+env_logger = { version = "0.11.2", optional = true }
 hex = "0.4.3"
 hmac = "0.12.1"
 log = "0.4.21"

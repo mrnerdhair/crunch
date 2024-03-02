@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 risc0-zkvm = { version = "0.20.1", default-features = false, features = ['std'] }
-crunch = { path = "../../crunch" }
+crunch = { path = "../../crunch", default-features = false }
