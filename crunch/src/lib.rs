@@ -13,7 +13,7 @@ mod dummy_server_cert_verifier;
 
 use std::{io::{Read, Write}, sync::{Arc, OnceLock, RwLock}};
 
-use crate::{dummy_crypto_provider::{DummyCryptoProvider, DummyCryptoProviderParams, DUMMY_ECDHE_SHARED_SECRET}, dummy_server_cert_verifier::ServerCertReport};
+use crate::{dummy_crypto_provider::{DummyCryptoProvider, DummyCryptoProviderParams, DummyKeys, DUMMY_ECDHE_SHARED_SECRET}, dummy_server_cert_verifier::ServerCertReport};
 use rustls::{client::Resumption, version::TLS13, ClientConfig, KeyLog, RootCertStore};
 use webpki::types::ServerName;
 use serde::{Serialize, Deserialize};
@@ -72,9 +72,7 @@ pub struct CrunchParams<'a> {
     client_request: &'a [u8],
     inputs: &'a [Message<'a>],
     #[cfg(not(feature = "uncrunch"))]
-    client_finished_key: Arc<OnceLock<Vec<u8>>>,
-    #[cfg(not(feature = "uncrunch"))]
-    server_finished_key: Arc<OnceLock<Vec<u8>>>,
+    dummy_keys: Arc<DummyKeys>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,11 +89,24 @@ pub fn fake_main() -> CrunchOutput {
     for i in 0..50 { client_request[i] = i as u8 }
     let client_request = client_request.as_slice();
 
-    let client_finished_key = Arc::new(OnceLock::<Vec::<u8>>::new());
-    let server_finished_key = Arc::new(OnceLock::<Vec::<u8>>::new());
+    #[cfg(not(feature = "uncrunch"))]
+    let dummy_keys = Arc::new(DummyKeys::default());
 
-    server_finished_key.set(hex::decode("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718").unwrap()).unwrap();
-    client_finished_key.set(hex::decode("a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2edd5ce61").unwrap()).unwrap();
+    #[cfg(not(feature = "uncrunch"))]
+    {
+        dummy_keys.server_finished_key.set(hex::decode("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718").unwrap()).unwrap();
+        dummy_keys.client_finished_key.set(hex::decode("a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2edd5ce61").unwrap()).unwrap();
+
+        dummy_keys.client_hs_traffic_key.set(hex::decode("dbfaa693d1762c5b666af5d950258d01").unwrap()).unwrap();
+        dummy_keys.server_hs_traffic_key.set(hex::decode("3fce516009c21727d0f2e4e86ee403bc").unwrap()).unwrap();
+        dummy_keys.client_ap_traffic_key.set(hex::decode("17422dda596ed5d9acd890e3c63f5051").unwrap()).unwrap();
+        dummy_keys.server_ap_traffic_key.set(hex::decode("9f02283b6c9c07efc26bb9f2ac92e356").unwrap()).unwrap();
+
+        dummy_keys.client_hs_traffic_iv.set(hex::decode("5bd3c71b836e0b76bb73265f").unwrap()).unwrap();
+        dummy_keys.server_hs_traffic_iv.set(hex::decode("5d313eb2671276ee13000b30").unwrap()).unwrap();
+        dummy_keys.client_ap_traffic_iv.set(hex::decode("5b78923dee08579033e523d9").unwrap()).unwrap();
+        dummy_keys.server_ap_traffic_iv.set(hex::decode("cf782b88dd83549aadf1e984").unwrap()).unwrap();
+    }
 
     let out = crunch(CrunchParams {
         server_name: "server".to_string(),
@@ -113,9 +124,7 @@ pub fn fake_main() -> CrunchOutput {
             Message::Server(include_bytes!("../rfc8448_sec3_07b_serverfull.bin")),
         ],
         #[cfg(not(feature = "uncrunch"))]
-        client_finished_key,
-        #[cfg(not(feature = "uncrunch"))]
-        server_finished_key,
+        dummy_keys,
     });
 
     println!("{:?}", out);
@@ -138,9 +147,7 @@ pub fn crunch(params: CrunchParams) -> CrunchOutput {
         #[cfg(not(feature = "uncrunch"))]
         shared_secret: DUMMY_ECDHE_SHARED_SECRET.to_vec(),
         #[cfg(not(feature = "uncrunch"))]
-        client_finished_key: params.client_finished_key,
-        #[cfg(not(feature = "uncrunch"))]
-        server_finished_key: params.server_finished_key,
+        dummy_keys: Arc::clone(&params.dummy_keys),
     });
     let mut client_config = ClientConfig::builder_with_provider(dummy_crypto_provider.get_crypto_provider())
         .with_protocol_versions(&[&TLS13]).unwrap()

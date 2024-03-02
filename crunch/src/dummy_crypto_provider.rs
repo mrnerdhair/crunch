@@ -48,14 +48,31 @@ pub struct DummyCryptoProvider {
     crypto_provider: Option<Arc<CryptoProvider>>,
 }
 
+#[derive(Debug, Default)]
+pub struct DummyKeys {
+    pub client_finished_key: OnceLock<Vec<u8>>,
+    pub server_finished_key: OnceLock<Vec<u8>>,
+
+    pub client_hs_traffic_key: OnceLock<Vec<u8>>,
+    pub client_hs_traffic_iv: OnceLock<Vec<u8>>,
+
+    pub server_hs_traffic_key: OnceLock<Vec<u8>>,
+    pub server_hs_traffic_iv: OnceLock<Vec<u8>>,
+
+    pub client_ap_traffic_key: OnceLock<Vec<u8>>,
+    pub client_ap_traffic_iv: OnceLock<Vec<u8>>,
+
+    pub server_ap_traffic_key: OnceLock<Vec<u8>>,
+    pub server_ap_traffic_iv: OnceLock<Vec<u8>>,
+}
+
 pub struct DummyCryptoProviderParams {
     pub dummy_random_data: Arc<RwLock<Vec<u8>>>,
     pub dummy_pubkey: Arc<Vec<u8>>,
     pub shared_secret: Vec<u8>,
+    
     #[cfg(not(feature = "uncrunch"))]
-    pub client_finished_key: Arc<OnceLock<Vec<u8>>>,
-    #[cfg(not(feature = "uncrunch"))]
-    pub server_finished_key: Arc<OnceLock<Vec<u8>>>,
+    pub dummy_keys: Arc<DummyKeys>,
 }
 
 impl DummyCryptoProvider {
@@ -63,7 +80,7 @@ impl DummyCryptoProvider {
         let params = Box::leak(Box::new(params));
 
         #[cfg(not(feature = "uncrunch"))]
-        let mut dummy_hkdf = DummyHkdf::new(&params.shared_secret, Arc::clone(&params.client_finished_key), Arc::clone(&params.server_finished_key));
+        let mut dummy_hkdf = DummyHkdf::new(&params.shared_secret, &params.dummy_keys);
         #[cfg(feature = "uncrunch")]
         let mut dummy_hkdf = DummyHkdf::new(&params.shared_secret);
 
@@ -263,6 +280,9 @@ impl DummyCryptoProvider {
             ],
             hash_sha256: HashSha256::default(),
             dummy_hkdf,
+            #[cfg(not(feature = "uncrunch"))]
+            aead_aes_128_gcm: AeadAes128Gcm::new(Arc::clone(&params.dummy_keys)),
+            #[cfg(feature = "uncrunch")]
             aead_aes_128_gcm: AeadAes128Gcm::default(),
             dummy_key_provider: DummyKeyProvider::default(),
             tls13_ciphersuites: vec![],

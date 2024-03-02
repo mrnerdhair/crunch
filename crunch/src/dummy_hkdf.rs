@@ -2,16 +2,14 @@ use std::sync::{Arc, OnceLock, RwLock};
 
 use rustls::crypto::{hmac::{self, Hmac}, tls13::{Hkdf, HkdfExpander, OkmBlock}, ActiveKeyExchange};
 
-use crate::{dummy_crypto_provider::{DUMMY_TLS13_CLIENT_FINISHED_KEY, DUMMY_TLS13_SERVER_FINISHED_KEY}, dummy_hkdf_expander::{DummyHkdfExpander, DummyHkdfExpanderValue, DummyHkdfIkm}, hmac_sha256::HmacSha256};
+use crate::{dummy_crypto_provider::{DUMMY_TLS13_CLIENT_FINISHED_KEY, DUMMY_TLS13_SERVER_FINISHED_KEY, DummyKeys}, dummy_hkdf_expander::{DummyHkdfExpander, DummyHkdfExpanderValue, DummyHkdfIkm}, hmac_sha256::HmacSha256};
 
 #[derive(Debug)]
 pub struct DummyHkdf {
     shared_secret: Vec<u8>,
     dummy_hkdf_expander_values: Arc<RwLock<Vec<DummyHkdfExpanderValue>>>,
     #[cfg(not(feature = "uncrunch"))]
-    dummy_client_finished_key: Arc<OnceLock<Vec<u8>>>,
-    #[cfg(not(feature = "uncrunch"))]
-    dummy_server_finished_key: Arc<OnceLock<Vec<u8>>>,
+    dummy_keys: Arc<DummyKeys>,
 }
 
 impl DummyHkdf {
@@ -24,12 +22,11 @@ impl DummyHkdf {
     }
 
     #[cfg(not(feature = "uncrunch"))]
-    pub fn new(shared_secret: &[u8], dummy_client_finished_key: Arc<OnceLock<Vec<u8>>>, dummy_server_finished_key: Arc<OnceLock<Vec<u8>>>) -> Self {
+    pub fn new(shared_secret: &[u8], dummy_keys: &Arc<DummyKeys>) -> Self {
         Self {
             shared_secret: shared_secret.to_vec(),
             dummy_hkdf_expander_values: Default::default(),
-            dummy_client_finished_key,
-            dummy_server_finished_key,
+            dummy_keys: Arc::clone(dummy_keys),
         }
     }
 }
@@ -59,8 +56,8 @@ impl Hkdf for DummyHkdf {
 
         #[cfg(not(feature = "uncrunch"))]
         match key {
-            &DUMMY_TLS13_SERVER_FINISHED_KEY => hmac::Tag::new(self.dummy_server_finished_key.get().expect("server finished key unavailable")),
-            &DUMMY_TLS13_CLIENT_FINISHED_KEY => hmac::Tag::new(self.dummy_client_finished_key.get().expect("client finished key unavailable")),
+            &DUMMY_TLS13_SERVER_FINISHED_KEY => hmac::Tag::new(self.dummy_keys.server_finished_key.get().expect("server finished key unavailable")),
+            &DUMMY_TLS13_CLIENT_FINISHED_KEY => hmac::Tag::new(self.dummy_keys.client_finished_key.get().expect("client finished key unavailable")),
             _ => panic!("DummyHkdf asked to hmac_sign {} with unexpected key {}", hex::encode(message), hex::encode(key.as_ref())),
             // _ => HmacSha256.with_key(key).sign(&[message]),
         }
