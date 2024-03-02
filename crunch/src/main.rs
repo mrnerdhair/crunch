@@ -32,27 +32,27 @@ impl KeyLog for PrintLnKeyLog {
 
 // }
 
-const HMAC_OUTER_BLOCK_PADDING: [u8; 32] = [0x80, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0x03, 0x00];
+// const HMAC_OUTER_BLOCK_PADDING: [u8; 32] = [0x80, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0x03, 0x00];
 
-pub fn test_hkdf_from_intermediates(mut outer_intermediate: [u8; 32], inner: [u8; 32]) -> [u8; 32] {
-    let mut block = [0u8; 64];
-    block[..32].copy_from_slice(&inner);
-    block[32..].copy_from_slice(&HMAC_OUTER_BLOCK_PADDING);
+// pub fn test_hkdf_from_intermediates(mut outer_intermediate: [u8; 32], inner: [u8; 32]) -> [u8; 32] {
+//     let mut block = [0u8; 64];
+//     block[..32].copy_from_slice(&inner);
+//     block[32..].copy_from_slice(&HMAC_OUTER_BLOCK_PADDING);
     
-    let mut key = [
-        u32::from_be_bytes(outer_intermediate[0..4]),
-        u32::from_be_bytes(outer_intermediate[4..8]),
-        u32::from_be_bytes(outer_intermediate[8..12]),
-        u32::from_be_bytes(outer_intermediate[12..16]),
-        u32::from_be_bytes(outer_intermediate[16..20]),
-        u32::from_be_bytes(outer_intermediate[20..24]),
-        u32::from_be_bytes(outer_intermediate[24..28]),
-        u32::from_be_bytes(outer_intermediate[24..32]),
-    ];
-    sha2::compress256(&mut [], &[block.into()]);
+//     let mut key = [
+//         u32::from_be_bytes(&outer_intermediate[0..4].try_into().unwrap()),
+//         u32::from_be_bytes(&outer_intermediate[4..8].try_into().unwrap()),
+//         u32::from_be_bytes(&outer_intermediate[8..12].try_into().unwrap()),
+//         u32::from_be_bytes(&outer_intermediate[12..16].try_into().unwrap()),
+//         u32::from_be_bytes(&outer_intermediate[16..20].try_into().unwrap()),
+//         u32::from_be_bytes(&outer_intermediate[20..24].try_into().unwrap()),
+//         u32::from_be_bytes(&outer_intermediate[24..28].try_into().unwrap()),
+//         u32::from_be_bytes(&outer_intermediate[24..32].try_into().unwrap()),
+//     ];
+//     sha2::compress256(&mut key, &[block.into()]);
 
-    outer_intermediate
-}
+//     outer_intermediate
+// }
 
 fn main() {
     env_logger::init();
