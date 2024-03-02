@@ -20,7 +20,7 @@ impl AeadAes128Gcm {
     }
 
     #[cfg(feature = "uncrunch")]
-    fn sub_dummy_keys(&self, key: &mut [u8; 16], iv: &mut [u8; 12]) {}
+    fn sub_dummy_keys(&self, _key: &mut [u8; 16], _iv: &mut [u8; 12]) {}
 
     #[cfg(not(feature = "uncrunch"))]
     fn sub_dummy_keys(&self, key: &mut [u8; 16], iv: &mut [u8; 12]) {

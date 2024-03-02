@@ -1,4 +1,4 @@
-use std::{sync::{Arc, RwLock}, vec};
+use std::{sync::{atomic::{AtomicBool, Ordering}, Arc, OnceLock, RwLock}, vec};
 
 use rustls::crypto::{hmac::Hmac, tls13::{HkdfExpander, OkmBlock, OutputLengthError}};
 #[cfg(feature = "uncrunch")]
@@ -61,6 +61,8 @@ impl DummyHkdfExpanderValue {
 pub struct DummyHkdfExpander {
     ikm: DummyHkdfIkm,
     values: Arc<RwLock<Vec<DummyHkdfExpanderValue>>>,
+    ch_sh_transcript_hash_reporter: Arc<OnceLock<[u8; 32]>>,
+    ch_sf_transcript_hash_reporter: Arc<OnceLock<[u8; 32]>>,
 }
 
 fn collect_info(info: &[&[u8]]) -> Vec<u8> {
@@ -82,8 +84,19 @@ impl HkdfExpander for DummyHkdfExpander {
             }
         }
 
+        #[cfg(debug_assertions)]
+        eprintln!("DummyHkdfExpander expanding ikm/info: {:x?} {}", self.ikm, hex::encode(&info));
+
+        if info.len() == 54 && &info[11..21] == b"hs traffic" {
+            let _ = self.ch_sh_transcript_hash_reporter.set(info[22..].try_into().unwrap());
+        }
+
+        if info.len() == 54 && &info[11..21] == b"ap traffic" {
+            let _ = self.ch_sf_transcript_hash_reporter.set(info[22..].try_into().unwrap());
+        }
+
         #[cfg(not(feature = "uncrunch"))]
-        panic!("DummyHkdfExpander asked to expand unexpected ikm/info: {:x?} {}", self.ikm, hex::encode(info));
+        panic!("DummyHkdfExpander asked to expand unexpected ikm/info: {:x?} {}", self.ikm, hex::encode(&info));
 
         #[cfg(feature = "uncrunch")]
         hkdf::Hkdf::<Sha256>::from_prk(&self.ikm.as_bytes()).or(Err(())).and_then(|x| x.expand(&info, output).or(Err(()))).or_else(|_| Err(OutputLengthError))
@@ -99,10 +112,12 @@ impl HkdfExpander for DummyHkdfExpander {
 }
 
 impl<'a> DummyHkdfExpander {
-    pub fn new(ikm: DummyHkdfIkm, values: Arc<RwLock<Vec<DummyHkdfExpanderValue>>>) -> Self {
+    pub fn new(ikm: DummyHkdfIkm, values: &Arc<RwLock<Vec<DummyHkdfExpanderValue>>>, ch_sh_transcript_hash_reporter: &Arc<OnceLock<[u8; 32]>>, ch_sf_transcript_hash_reporter: &Arc<OnceLock<[u8; 32]>>) -> Self {
         let out = Self {
             ikm,
-            values,
+            values: Arc::clone(values),
+            ch_sh_transcript_hash_reporter: Arc::clone(ch_sh_transcript_hash_reporter),
+            ch_sf_transcript_hash_reporter: Arc::clone(ch_sf_transcript_hash_reporter),
         };
 
         out
