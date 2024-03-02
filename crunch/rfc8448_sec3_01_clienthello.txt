@@ -1,0 +1,83 @@
+16
+0301
+00c4
+
+01
+0000c0
+0303
+cb34ecb1e78163ba1c38c6dacb196a6dffa21a8d9912ec18a2ef6283024dece7
+00
+0006
+1301 // TLS_AES_128_GCM_SHA256
+1303 // TLS_CHACHA20_POLY1305_SHA256
+1302 // TLS_AES_256_GCM_SHA384
+01
+00
+0091
+
+0000 // sni
+000b
+0009
+00
+0006
+736572766572 // "server"
+
+ff01 // renegotiation_info
+0001
+00
+
+000a // supported_groups
+0014
+0012
+001d // x25519
+0017 // secp256r1
+0018 // secp384r1
+0019 // secp521r1
+0100 // ffdhe2048
+0101 // ffdhe3072
+0102 // ffdhe4096
+0103 // ffdhe6144
+0104 // ffdhe8192
+
+0023 // session_ticket
+0000
+
+0033 // key_share
+0026
+0024
+001d
+0020
+99381de560e4bd43d23d8e435a7dbafeb3c06e51c13cae4d5413691e529aaf2c
+
+
+002b // supported_versions
+0003
+02
+0304
+
+000d
+0020
+001e
+0403 // ecdsa_secp256r1_sha256
+0503 // ecdsa_secp384r1_sha384
+0603 // ecdsa_secp521r1_sha512
+0203 // ecdsa_sha1
+0804 // rsa_pss_rsae_sha256
+0805 // rsa_pss_rsae_sha384
+0806 // rsa_pss_rsae_sha512
+0401 // rsa_pkcs1_sha256
+0501 // rsa_pkcs1_sha384
+0601 // rsa_pkcs1_sha512
+0201 // rsa_pkcs1_sha1
+0402 // dsa_sha256_RESERVED
+0502 // dsa_sha384_RESERVED
+0602 // dsa_sha512_RESERVED
+0202 // dsa_sha1_RESERVED
+
+002d // psk_key_exchange_modes
+0002
+0101
+
+001c // record_size_limit
+0002
+4001

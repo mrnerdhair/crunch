@@ -29,8 +29,10 @@ impl Hkdf for DummyHkdf {
         },  Arc::clone(&self.dummy_hkdf_expander_values)))
     }
 
-    fn hmac_sign(&self, _key: &OkmBlock, _message: &[u8]) -> hmac::Tag {
-        todo!()
+    fn hmac_sign(&self, key: &OkmBlock, message: &[u8]) -> hmac::Tag {
+        println!("hmac_sign: {} {}", hex::encode(key.as_ref()), hex::encode(message));
+        hmac::Tag::new(&hex::decode("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718").unwrap())
+        // todo!()
         // self.hmac.with_key(key.as_ref()).sign(&[message])
     }
 

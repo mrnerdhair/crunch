@@ -7,15 +7,55 @@ use rustls::SignatureScheme;
 use webpki::alg_id;
 
 pub static ALGORITHMS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgorithms {
-    all: &[RSA_PSS_SHA256, RSA_PKCS1_SHA256],
+    all: &[
+        RSA_PSS_SHA256,
+        RSA_PKCS1_SHA256,
+        DUMMY_SIGNATURE_VERIFICATION_ALGORITHM
+    ],
     mapping: &[
+        (SignatureScheme::ECDSA_NISTP256_SHA256, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        (SignatureScheme::ECDSA_NISTP384_SHA384, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        (SignatureScheme::ECDSA_NISTP521_SHA512, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        (SignatureScheme::ECDSA_SHA1_Legacy, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
         (SignatureScheme::RSA_PSS_SHA256, &[RSA_PSS_SHA256]),
+        (SignatureScheme::RSA_PSS_SHA384, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        (SignatureScheme::RSA_PSS_SHA512, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
         (SignatureScheme::RSA_PKCS1_SHA256, &[RSA_PKCS1_SHA256]),
+        (SignatureScheme::RSA_PKCS1_SHA384, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        (SignatureScheme::RSA_PKCS1_SHA512, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        (SignatureScheme::RSA_PKCS1_SHA1, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        (SignatureScheme::Unknown(0x0402), &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        (SignatureScheme::Unknown(0x0502), &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        (SignatureScheme::Unknown(0x0602), &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        (SignatureScheme::Unknown(0x0202), &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
     ],
 };
 
 static RSA_PSS_SHA256: &dyn SignatureVerificationAlgorithm = &RsaPssSha256Verify;
 static RSA_PKCS1_SHA256: &dyn SignatureVerificationAlgorithm = &RsaPkcs1Sha256Verify;
+static DUMMY_SIGNATURE_VERIFICATION_ALGORITHM: &dyn SignatureVerificationAlgorithm = &DummySignatureVerificationAlgorithm;
+
+#[derive(Debug, Default)]
+pub struct DummySignatureVerificationAlgorithm;
+
+impl SignatureVerificationAlgorithm for DummySignatureVerificationAlgorithm {
+    fn verify_signature(
+        &self,
+        _public_key: &[u8],
+        _message: &[u8],
+        _signature: &[u8],
+    ) -> Result<(), InvalidSignature> {
+        unimplemented!()
+    }
+
+    fn public_key_alg_id(&self) -> AlgorithmIdentifier {
+        unimplemented!()
+    }
+
+    fn signature_alg_id(&self) -> AlgorithmIdentifier {
+        unimplemented!()
+    }
+}
 
 #[derive(Debug)]
 struct RsaPssSha256Verify;

@@ -1,0 +1,3 @@
+[submodule "rustls"]
+	path = rustls
+	url = https://github.com/mrnerdhair/rustls
