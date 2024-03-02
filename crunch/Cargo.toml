@@ -9,6 +9,14 @@ edition = "2021"
 default = ["cli"]
 cli = ["dep:env_logger"]
 
+[lib]
+name = "crunch"
+path = "src/lib.rs"
+
+[[bin]]
+name = "crunch"
+path = "src/bin.rs"
+
 [dependencies]
 aes-gcm = "0.10.3"
 block-buffer = "0.10.4"
