@@ -24,7 +24,7 @@ impl SecureRandom for DummySecureRandom {
         buf.copy_from_slice(&data[0..buf.len()]);
 
         #[cfg(debug_assertions)]
-        eprintln!("{}", hex::encode(buf));
+        eprintln!("returning random: {}", hex::encode(buf));
 
         Ok(())
     }

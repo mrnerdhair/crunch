@@ -70,6 +70,7 @@ fn build_nonce(iv: [u8; 12], seq: u64) -> [u8; 12] {
     
     let mut out = [0u8; 12];
     for i in 0..iv.len() { out[i] = iv[i] ^ padded_iv[i]; }
+
     out
 }
 
@@ -81,13 +82,13 @@ pub struct AeadAes128GcmMessageEncrypter {
 impl MessageEncrypter for AeadAes128GcmMessageEncrypter {
     fn encrypt(&mut self, msg: BorrowedPlainMessage, seq: u64) -> Result<OpaqueMessage, rustls::Error> {
         let nonce = build_nonce(self.iv, seq);
-        let associated_data = make_tls13_aad(msg.payload.len());
         let mut buffer = msg.payload.to_vec();
-        println!("barbaz: {} {}", seq, hex::encode(&buffer));
         buffer.extend_from_slice(&[msg.typ.get_u8()]);
+
+        let associated_data = make_tls13_aad(buffer.len() + 16);
+
         aes_gcm::Aes128Gcm::new(&self.key.into()).encrypt_in_place(&nonce.into(), &associated_data, &mut buffer).map_err(|_| rustls::Error::EncryptError)?;
 
-        println!("bazbash: {}", hex::encode(&buffer));
         Ok(OpaqueMessage::new(rustls::ContentType::ApplicationData, rustls::ProtocolVersion::TLSv1_2, buffer))
     }
 
@@ -95,7 +96,6 @@ impl MessageEncrypter for AeadAes128GcmMessageEncrypter {
         payload_len - 16
     }
 }
-
 
 pub struct AeadAes128GcmMessageDecrypter {
     key: [u8; 16],

@@ -32,15 +32,27 @@ impl KeyLog for PrintLnKeyLog {
 
 // }
 
-// const HMAC_OUTER_BLOCK_PADDING: [u8; 32] = [0x80, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0x03, 0x00];
+const HMAC_OUTER_BLOCK_PADDING: [u8; 32] = [0x80, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0x03, 0x00];
 
-// pub fn test_hkdf_from_intermediates(mut outer_intermediate: [u8; 32], inner: [u8; 32]) -> [u8; 32] {
-//     let mut block = [0u8; 64];
-//     block[..32].copy_from_slice(&inner);
-//     block[32..].copy_from_slice(&HMAC_OUTER_BLOCK_PADDING);
+pub fn test_hkdf_from_intermediates(mut outer_intermediate: [u8; 32], inner: [u8; 32]) -> [u8; 32] {
+    let mut block = [0u8; 64];
+    block[..32].copy_from_slice(&inner);
+    block[32..].copy_from_slice(&HMAC_OUTER_BLOCK_PADDING);
     
-//     sha2::compress256(outer_intermediate.into(), &[block.into()]);
-// }
+    let mut key = [
+        u32::from_be_bytes(outer_intermediate[0..4]),
+        u32::from_be_bytes(outer_intermediate[4..8]),
+        u32::from_be_bytes(outer_intermediate[8..12]),
+        u32::from_be_bytes(outer_intermediate[12..16]),
+        u32::from_be_bytes(outer_intermediate[16..20]),
+        u32::from_be_bytes(outer_intermediate[20..24]),
+        u32::from_be_bytes(outer_intermediate[24..28]),
+        u32::from_be_bytes(outer_intermediate[24..32]),
+    ];
+    sha2::compress256(&mut [], &[block.into()]);
+
+    outer_intermediate
+}
 
 fn main() {
     env_logger::init();
@@ -64,21 +76,16 @@ fn main() {
     client_config.key_log = Arc::new(PrintLnKeyLog::default());
     client_config.dangerous().set_certificate_verifier(Arc::new(DummyServerCertVerifier::new(dummy_crypto_provider.get_crypto_provider())));
 
-    #[cfg(debug_assertions)]
-    eprintln!("{:?}", client_config);
-
     let rc_config = Arc::new(client_config);
     let example_com = "server".try_into().unwrap();
     let mut client = rustls::ClientConnection::new(rc_config, example_com).expect("failed to create client connection");
 
-    #[cfg(debug_assertions)]
-    eprintln!("{:?}", client);
     assert!(!client.wants_read());
     assert!(client.wants_write());
 
     let mut buf = Vec::<u8>::new();
     client.write_tls(&mut buf).unwrap();
-    println!("{}", hex::encode(buf));
+    println!("sending: {}", hex::encode(buf));
 
     assert!(!client.wants_write());
     assert!(client.wants_read());
@@ -93,7 +100,7 @@ fn main() {
 
     let mut buf = Vec::<u8>::new();
     client.write_tls(&mut buf).unwrap();
-    println!("{}", hex::encode(buf));
+    println!("sending: {}", hex::encode(buf));
 
     assert!(!client.wants_write());
     assert!(client.wants_read());
@@ -108,7 +115,7 @@ fn main() {
 
     let mut buf = Vec::<u8>::new();
     client.write_tls(&mut buf).unwrap();
-    println!("{}", hex::encode(buf));
+    println!("sending: {}", hex::encode(buf));
 
     assert!(!client.wants_write());
     assert!(client.wants_read());
@@ -120,7 +127,6 @@ fn main() {
 
     let mut out = [0u8; 50];
     for i in 0..50 { out[i] = i as u8 }
-    println!("foobar: {}", hex::encode(&out));
     client.writer().write(&out).unwrap();
 
     assert!(client.wants_write());
@@ -128,7 +134,7 @@ fn main() {
 
     let mut buf = Vec::<u8>::new();
     client.write_tls(&mut buf).unwrap();
-    println!("{}", hex::encode(buf));
+    println!("sending: {}", hex::encode(buf));
 
     assert!(!client.wants_write());
     // assert!(client.wants_read());
@@ -138,7 +144,23 @@ fn main() {
     client.read_tls(&mut server_input).unwrap();
     client.process_new_packets().unwrap();
 
+    client.send_close_notify();
+
+    assert!(client.wants_write());
+    let mut buf = Vec::<u8>::new();
+    client.write_tls(&mut buf).unwrap();
+    println!("sending: {}", hex::encode(buf));
+    assert!(!client.wants_write());
+
+    let server_input = include_bytes!("../rfc8448_sec3_09_serveralert.bin").to_vec();
+    let mut server_input = server_input.as_slice();
+    client.read_tls(&mut server_input).unwrap();
+    client.process_new_packets().unwrap();
+
+    assert!(!client.wants_read());
+    assert!(!client.wants_write());
+
     let mut plaintext = Vec::<u8>::new();
     client.reader().read_to_end(&mut plaintext).unwrap();
-    println!("{}", hex::encode(plaintext));
+    println!("received: {}", hex::encode(plaintext));
 }
