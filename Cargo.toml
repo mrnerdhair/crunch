@@ -13,7 +13,7 @@ hex = "0.4.3"
 hmac = "0.12.1"
 rsa = { version = "0.9.6", features = ["sha2"], default-features = false }
 rustls = { version = "0.22.2", default-features = false, features = ["logging"] }
-sha2 = "0.10.8"
+sha2 = { version = "0.10.8", features = ["compress"] }
 webpki = { package = "rustls-webpki", version = "0.102", features = ["alloc"], default-features = false }
 webpki-roots = "0.26.1"
 zeroize = { version = "1.7.0", features = ["zeroize_derive"] }

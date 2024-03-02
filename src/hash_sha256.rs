@@ -1,6 +1,7 @@
 use rustls::crypto::hash;
 use sha2::{Digest, Sha256};
 
+#[derive(Debug, Default)]
 pub struct HashSha256;
 
 impl hash::Hash for HashSha256 {

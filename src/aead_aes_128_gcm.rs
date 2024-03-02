@@ -1,6 +1,8 @@
 use aes_gcm::{AeadInPlace, KeyInit};
 use rustls::{crypto::cipher::{make_tls13_aad, AeadKey, BorrowedPlainMessage, Iv, MessageDecrypter, MessageEncrypter, OpaqueMessage, PlainMessage, Tls13AeadAlgorithm, UnsupportedOperationError}, ConnectionTrafficSecrets};
 
+
+#[derive(Debug, Default)]
 pub struct AeadAes128Gcm;
 
 impl Tls13AeadAlgorithm for AeadAes128Gcm {

@@ -12,7 +12,7 @@ impl ActiveKeyExchange for DummyActiveKeyExchange {
     fn group(&self) -> NamedGroup { self.named_group }
     fn pub_key(&self) -> &[u8] { &self.pubkey }
     fn complete(self: Box<Self>, _peer_pub_key: &[u8]) -> Result<SharedSecret, rustls::Error> {
-        panic!("DummyActiveKeyExchange asked to actually complete key exchange")
+        panic!("DummyActiveKeyExchange can't actually complete key exchange")
     }
 }
 
