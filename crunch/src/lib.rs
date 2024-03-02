@@ -1,3 +1,5 @@
+#![allow(unused_imports, dead_code, unused_variables, unused_mut)]
+
 mod dummy_hkdf_expander;
 mod dummy_hkdf;
 mod dummy_supported_kx_group;
