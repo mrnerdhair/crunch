@@ -1,11 +1,10 @@
-use std::{sync::{Arc, RwLock}, vec};
+use std::{sync::{Arc, OnceLock, RwLock}, vec};
 
 use rustls::{crypto::{CipherSuiteCommon, CryptoProvider, SupportedKxGroup, WebPkiSupportedAlgorithms}, CipherSuite, NamedGroup, SupportedCipherSuite, Tls13CipherSuite};
 
 use crate::{aead_aes_128_gcm::AeadAes128Gcm, dummy_hkdf::DummyHkdf, dummy_hkdf_expander::{DummyHkdfExpanderValue, DummyHkdfIkm}, dummy_key_provider::DummyKeyProvider, dummy_secure_random::DummySecureRandom, dummy_supported_kx_group::DummySupportedKxGroup, hash_sha256::HashSha256, verify};
 
 pub const DUMMY_ECDHE_SHARED_SECRET: [u8; 32] = *b"ECDHE_SHARED_SECRET\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-// 6f2615a108c702c5678f54fc9dbab69716c076189c48250cebeac3576c3611ba
 pub const DUMMY_HANDSHAKE_SECRET_IKM: [u8; 32] = *b"HANDSHAKE_SECRET_IKM\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
 pub const DUMMY_MASTER_SECRET_IKM: [u8; 32] = *b"MASTER_SECRET_IKM\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
 pub const DUMMY_TLS13_C_HS_TRAFFIC: [u8; 32] = *b"TLS13_C_HS_TRAFFIC\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
@@ -49,16 +48,33 @@ pub struct DummyCryptoProvider {
     crypto_provider: Option<Arc<CryptoProvider>>,
 }
 
-impl DummyCryptoProvider {
-    pub fn new_leak(dummy_random_data: &Arc<RwLock<Vec<u8>>>, dummy_pubkey: &Arc<Vec<u8>>) -> &'static Self {
-        let mut dummy_hkdf = DummyHkdf::default();
+pub struct DummyCryptoProviderParams {
+    pub dummy_random_data: Arc<RwLock<Vec<u8>>>,
+    pub dummy_pubkey: Arc<Vec<u8>>,
+    pub shared_secret: Vec<u8>,
+    #[cfg(not(feature = "uncrunch"))]
+    pub client_finished_key: Arc<OnceLock<Vec<u8>>>,
+    #[cfg(not(feature = "uncrunch"))]
+    pub server_finished_key: Arc<OnceLock<Vec<u8>>>,
+}
 
+impl DummyCryptoProvider {
+    pub fn new_leak(params: DummyCryptoProviderParams) -> &'static Self {
+        let params = Box::leak(Box::new(params));
+
+        #[cfg(not(feature = "uncrunch"))]
+        let mut dummy_hkdf = DummyHkdf::new(&params.shared_secret, Arc::clone(&params.client_finished_key), Arc::clone(&params.server_finished_key));
+        #[cfg(feature = "uncrunch")]
+        let mut dummy_hkdf = DummyHkdf::new(&params.shared_secret);
+
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::ZeroIkm { salt: None },
             &INFO_PREFIX_TLS13_DERIVED,
             &DUMMY_HANDSHAKE_SECRET_IKM,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Secret {
                 salt: Some(DUMMY_ECDHE_SHARED_SECRET.to_vec()),
@@ -68,6 +84,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_C_HS_TRAFFIC,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Secret {
                 salt: Some(DUMMY_ECDHE_SHARED_SECRET.to_vec()),
@@ -77,6 +94,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_S_HS_TRAFFIC,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Secret {
                 salt: Some(DUMMY_ECDHE_SHARED_SECRET.to_vec()),
@@ -86,6 +104,7 @@ impl DummyCryptoProvider {
             &DUMMY_MASTER_SECRET_IKM,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::ZeroIkm {
                 salt: Some(DUMMY_MASTER_SECRET_IKM.to_vec()),
@@ -94,6 +113,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_C_AP_TRAFFIC,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::ZeroIkm {
                 salt: Some(DUMMY_MASTER_SECRET_IKM.to_vec()),
@@ -102,6 +122,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_S_AP_TRAFFIC,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::ZeroIkm {
                 salt: Some(DUMMY_MASTER_SECRET_IKM.to_vec()),
@@ -110,6 +131,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_EXP_MASTER,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::ZeroIkm {
                 salt: Some(DUMMY_MASTER_SECRET_IKM.to_vec()),
@@ -118,6 +140,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_RES_MASTER,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_C_HS_TRAFFIC.to_vec(),
@@ -126,6 +149,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_C_HS_TRAFFIC_KEY,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_C_HS_TRAFFIC.to_vec(),
@@ -134,6 +158,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_C_HS_TRAFFIC_IV,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_S_HS_TRAFFIC.to_vec(),
@@ -142,6 +167,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_S_HS_TRAFFIC_KEY,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_S_HS_TRAFFIC.to_vec(),
@@ -150,6 +176,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_S_HS_TRAFFIC_IV,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_C_AP_TRAFFIC.to_vec(),
@@ -158,6 +185,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_C_AP_TRAFFIC_KEY,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_C_AP_TRAFFIC.to_vec(),
@@ -166,6 +194,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_C_AP_TRAFFIC_IV,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_S_AP_TRAFFIC.to_vec(),
@@ -174,6 +203,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_S_AP_TRAFFIC_KEY,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_S_AP_TRAFFIC.to_vec(),
@@ -182,6 +212,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_S_AP_TRAFFIC_IV,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_S_HS_TRAFFIC.to_vec(),
@@ -190,6 +221,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_SERVER_FINISHED_KEY,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_C_HS_TRAFFIC.to_vec(),
@@ -198,6 +230,7 @@ impl DummyCryptoProvider {
             &DUMMY_TLS13_CLIENT_FINISHED_KEY,
         ));
 
+        #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
             DummyHkdfIkm::Okm {
                 okm: DUMMY_TLS13_RES_MASTER.to_vec(),
@@ -208,17 +241,25 @@ impl DummyCryptoProvider {
 
         let out = Box::leak(Box::new(Self {
             signature_verification_algorithms: verify::ALGORITHMS,
-            dummy_secure_random: DummySecureRandom::new(dummy_random_data),
+            dummy_secure_random: DummySecureRandom::new(&params.dummy_random_data),
             dummy_supported_kx_groups: vec![
-                DummySupportedKxGroup::new(NamedGroup::X25519, dummy_pubkey),
-                DummySupportedKxGroup::new(NamedGroup::secp256r1, dummy_pubkey),
-                DummySupportedKxGroup::new(NamedGroup::secp384r1, dummy_pubkey),
-                DummySupportedKxGroup::new(NamedGroup::secp521r1, dummy_pubkey),
-                DummySupportedKxGroup::new(NamedGroup::FFDHE2048, dummy_pubkey),
-                DummySupportedKxGroup::new(NamedGroup::FFDHE3072, dummy_pubkey),
-                DummySupportedKxGroup::new(NamedGroup::FFDHE4096, dummy_pubkey),
-                DummySupportedKxGroup::new(NamedGroup::FFDHE6144, dummy_pubkey),
-                DummySupportedKxGroup::new(NamedGroup::FFDHE8192, dummy_pubkey),
+                DummySupportedKxGroup::new(NamedGroup::X25519, &params.dummy_pubkey),
+                #[cfg(feature = "rfc8448")]
+                DummySupportedKxGroup::new(NamedGroup::secp256r1, &params.dummy_pubkey),
+                #[cfg(feature = "rfc8448")]
+                DummySupportedKxGroup::new(NamedGroup::secp384r1, &params.dummy_pubkey),
+                #[cfg(feature = "rfc8448")]
+                DummySupportedKxGroup::new(NamedGroup::secp521r1, &params.dummy_pubkey),
+                #[cfg(feature = "rfc8448")]
+                DummySupportedKxGroup::new(NamedGroup::FFDHE2048, &params.dummy_pubkey),
+                #[cfg(feature = "rfc8448")]
+                DummySupportedKxGroup::new(NamedGroup::FFDHE3072, &params.dummy_pubkey),
+                #[cfg(feature = "rfc8448")]
+                DummySupportedKxGroup::new(NamedGroup::FFDHE4096, &params.dummy_pubkey),
+                #[cfg(feature = "rfc8448")]
+                DummySupportedKxGroup::new(NamedGroup::FFDHE6144, &params.dummy_pubkey),
+                #[cfg(feature = "rfc8448")]
+                DummySupportedKxGroup::new(NamedGroup::FFDHE8192, &params.dummy_pubkey),
             ],
             hash_sha256: HashSha256::default(),
             dummy_hkdf,
@@ -240,6 +281,7 @@ impl DummyCryptoProvider {
             quic: None,
         });
 
+        #[cfg(feature = "rfc8448")]
         out.tls13_ciphersuites.push(Tls13CipherSuite {
             common: CipherSuiteCommon {
                 suite: CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
@@ -252,6 +294,7 @@ impl DummyCryptoProvider {
             quic: None,
         });
 
+        #[cfg(feature = "rfc8448")]
         out.tls13_ciphersuites.push(Tls13CipherSuite {
             common: CipherSuiteCommon {
                 suite: CipherSuite::TLS13_AES_256_GCM_SHA384,

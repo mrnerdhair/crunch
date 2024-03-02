@@ -13,20 +13,33 @@ pub static ALGORITHMS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgorithms {
         DUMMY_SIGNATURE_VERIFICATION_ALGORITHM
     ],
     mapping: &[
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::ECDSA_NISTP256_SHA256, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::ECDSA_NISTP384_SHA384, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::ECDSA_NISTP521_SHA512, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::ECDSA_SHA1_Legacy, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
         (SignatureScheme::RSA_PSS_SHA256, &[RSA_PSS_SHA256]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::RSA_PSS_SHA384, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::RSA_PSS_SHA512, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
         (SignatureScheme::RSA_PKCS1_SHA256, &[RSA_PKCS1_SHA256]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::RSA_PKCS1_SHA384, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::RSA_PKCS1_SHA512, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::RSA_PKCS1_SHA1, &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::Unknown(0x0402), &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::Unknown(0x0502), &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::Unknown(0x0602), &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
+        #[cfg(feature = "rfc8448")]
         (SignatureScheme::Unknown(0x0202), &[DUMMY_SIGNATURE_VERIFICATION_ALGORITHM]),
     ],
 };

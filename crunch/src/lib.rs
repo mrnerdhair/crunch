@@ -11,10 +11,12 @@ mod dummy_secure_random;
 mod dummy_key_provider;
 mod dummy_server_cert_verifier;
 
-use std::{io::{Read, Write}, sync::{Arc, RwLock}};
+use std::{io::{Read, Write}, sync::{Arc, OnceLock, RwLock}};
 
-use crate::dummy_crypto_provider::DummyCryptoProvider;
+use crate::{dummy_crypto_provider::{DummyCryptoProvider, DummyCryptoProviderParams, DUMMY_ECDHE_SHARED_SECRET}, dummy_server_cert_verifier::ServerCertReport};
 use rustls::{client::Resumption, version::TLS13, ClientConfig, KeyLog, RootCertStore};
+use webpki::types::ServerName;
+use serde::{Serialize, Deserialize};
 
 use crate::dummy_server_cert_verifier::DummyServerCertVerifier;
 
@@ -54,31 +56,54 @@ impl KeyLog for PrintLnKeyLog {
 //     outer_intermediate
 // }
 
+#[derive(Debug)]
 pub enum Message<'a> {
     Client(&'a [u8]),
     Server(&'a [u8]),
 }
 
+#[derive(Debug)]
 pub struct CrunchParams<'a> {
+    server_name: String,
     client_random: [u8; 32],
     client_key_share: [u8; 32],
+    #[cfg(feature = "uncrunch")]
+    shared_secret: [u8; 32],
     client_request: &'a [u8],
     inputs: &'a [Message<'a>],
+    #[cfg(not(feature = "uncrunch"))]
+    client_finished_key: Arc<OnceLock<Vec<u8>>>,
+    #[cfg(not(feature = "uncrunch"))]
+    server_finished_key: Arc<OnceLock<Vec<u8>>>,
 }
 
-pub fn fake_main() {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrunchOutput {
+    pub server_response: Vec<u8>,
+    pub server_cert_report: ServerCertReport,
+}
+
+pub fn fake_main() -> CrunchOutput {
     let client_random = hex::decode("cb34ecb1e78163ba1c38c6dacb196a6dffa21a8d9912ec18a2ef6283024dece7").unwrap();
-    // let session_id = hex::decode("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef").unwrap();
     let client_key_share = hex::decode("99381de560e4bd43d23d8e435a7dbafeb3c06e51c13cae4d5413691e529aaf2c").unwrap();
 
     let mut client_request = [0u8; 50];
     for i in 0..50 { client_request[i] = i as u8 }
     let client_request = client_request.as_slice();
 
+    let client_finished_key = Arc::new(OnceLock::<Vec::<u8>>::new());
+    let server_finished_key = Arc::new(OnceLock::<Vec::<u8>>::new());
+
+    server_finished_key.set(hex::decode("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718").unwrap()).unwrap();
+    client_finished_key.set(hex::decode("a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2edd5ce61").unwrap()).unwrap();
+
     let out = crunch(CrunchParams {
+        server_name: "server".to_string(),
         client_random: client_random.try_into().unwrap(),
         client_key_share: client_key_share.try_into().unwrap(),
         client_request: &client_request,
+        #[cfg(feature = "uncrunch")]
+        shared_secret: hex::decode("8bd4054fb55b9d63fdfbacf9f04b9f0d35e6d63f537563efd46272900f89492d").unwrap().try_into().unwrap(),
         inputs: &[
             Message::Client(include_bytes!("../rfc8448_sec3_01_clienthello.bin")),
             Message::Server(include_bytes!("../rfc8448_sec3_02b_serverfull.bin")),
@@ -87,31 +112,56 @@ pub fn fake_main() {
             Message::Client(include_bytes!("../rfc8448_sec3_06b_clientfull.bin")),
             Message::Server(include_bytes!("../rfc8448_sec3_07b_serverfull.bin")),
         ],
+        #[cfg(not(feature = "uncrunch"))]
+        client_finished_key,
+        #[cfg(not(feature = "uncrunch"))]
+        server_finished_key,
     });
 
     println!("{:?}", out);
+
+    out
 }
 
-pub fn crunch(params: CrunchParams) {
+pub fn crunch(params: CrunchParams) -> CrunchOutput {
     // let dummy_random_data: Vec<u8> = [client_random.into_iter(), session_id.into_iter()].into_iter().flatten().collect();
     let dummy_random_data: Vec<u8> = [params.client_random.into_iter()].into_iter().flatten().collect();
     let dummy_random_data = Arc::new(RwLock::new(dummy_random_data));
 
     let dummy_pubkey = Arc::new(params.client_key_share.to_vec());
-    let dummy_crypto_provider = DummyCryptoProvider::new_leak(&dummy_random_data, &dummy_pubkey);
+
+    let dummy_crypto_provider = DummyCryptoProvider::new_leak(DummyCryptoProviderParams {
+        dummy_random_data,
+        dummy_pubkey,
+        #[cfg(feature = "uncrunch")]
+        shared_secret: params.shared_secret.to_vec(),
+        #[cfg(not(feature = "uncrunch"))]
+        shared_secret: DUMMY_ECDHE_SHARED_SECRET.to_vec(),
+        #[cfg(not(feature = "uncrunch"))]
+        client_finished_key: params.client_finished_key,
+        #[cfg(not(feature = "uncrunch"))]
+        server_finished_key: params.server_finished_key,
+    });
     let mut client_config = ClientConfig::builder_with_provider(dummy_crypto_provider.get_crypto_provider())
         .with_protocol_versions(&[&TLS13]).unwrap()
         .with_root_certificates(Arc::new(RootCertStore::empty()))
         .with_no_client_auth();
 
     client_config.resumption = Resumption::disabled();
-    // client_config.alpn_protocols.push("http/1.1".as_bytes().to_vec());
-    client_config.key_log = Arc::new(PrintLnKeyLog::default());
-    client_config.dangerous().set_certificate_verifier(Arc::new(DummyServerCertVerifier::new(dummy_crypto_provider.get_crypto_provider())));
+    #[cfg(not(feature = "rfc8448"))]
+    client_config.alpn_protocols.push("http/1.1".as_bytes().to_vec());
+
+    #[cfg(feature = "uncrunch")]
+    {
+        client_config.key_log = Arc::new(PrintLnKeyLog::default());
+    }
+
+    let server_cert_reporter: Arc<OnceLock<ServerCertReport>> = Arc::new(OnceLock::<ServerCertReport>::new());
+    client_config.dangerous().set_certificate_verifier(Arc::new(DummyServerCertVerifier::new(dummy_crypto_provider.get_crypto_provider(), Arc::clone(&server_cert_reporter))));
 
     let rc_config = Arc::new(client_config);
-    let example_com = "server".try_into().unwrap();
-    let mut client = rustls::ClientConnection::new(rc_config, example_com).expect("failed to create client connection");
+    let server_name: ServerName = params.server_name.try_into().unwrap();
+    let mut client = rustls::ClientConnection::new(rc_config, server_name).expect("failed to create client connection");
 
     let mut sent_appdata = false;
     for input in params.inputs.iter() {
@@ -140,5 +190,9 @@ pub fn crunch(params: CrunchParams) {
 
     let mut plaintext = Vec::<u8>::new();
     client.reader().read_to_end(&mut plaintext).unwrap();
-    println!("received: {}", hex::encode(plaintext));
+
+    CrunchOutput {
+        server_cert_report: server_cert_reporter.get().unwrap().clone(),
+        server_response: plaintext,
+    }
 }

@@ -619,11 +619,13 @@ dependencies = [
  "der",
  "env_logger 0.11.2",
  "hex",
+ "hkdf",
  "hmac",
  "log",
  "rsa",
  "rustls 0.22.2",
  "rustls-webpki 0.102.2",
+ "serde",
  "sha2",
  "webpki-roots 0.26.1",
  "zeroize",
@@ -948,6 +950,15 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hkdf"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
+dependencies = [
+ "hmac",
+]
 
 [[package]]
 name = "hmac"

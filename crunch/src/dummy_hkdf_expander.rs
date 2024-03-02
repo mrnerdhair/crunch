@@ -1,8 +1,12 @@
 use std::{sync::{Arc, RwLock}, vec};
 
-use rustls::crypto::tls13::{HkdfExpander, OkmBlock, OutputLengthError};
+use rustls::crypto::{hmac::Hmac, tls13::{HkdfExpander, OkmBlock, OutputLengthError}};
+#[cfg(feature = "uncrunch")]
+use sha2::Sha256;
 
-#[derive(Debug, PartialEq)]
+use crate::hmac_sha256::HmacSha256;
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum DummyHkdfIkm {
     ZeroIkm {
         salt: Option<Vec<u8>>,
@@ -13,6 +17,26 @@ pub enum DummyHkdfIkm {
     },
     Okm {
         okm: Vec<u8>,
+    }
+}
+
+impl DummyHkdfIkm {
+    #[cfg_attr(not(feature = "uncrunch"), allow(dead_code))]
+    pub fn as_bytes(&self) -> Vec<u8> {
+        match &self {
+            DummyHkdfIkm::ZeroIkm{ salt } => {
+                HmacSha256.with_key(&salt.as_ref().unwrap_or(&vec![0u8; 32])).sign(&[&[0u8; 32]]).as_ref().to_vec()
+            },
+            DummyHkdfIkm::Secret { salt, secret } => {
+                let zero_salt = vec![0u8; 32];
+                let salt = salt.as_ref().unwrap_or(&zero_salt);
+                let (secret, salt) = (salt, secret);
+                HmacSha256.with_key(salt).sign(&[secret]).as_ref().to_vec()
+            },
+            DummyHkdfIkm::Okm { okm } => {
+                okm.to_vec()
+            },
+        }
     }
 }
 
@@ -58,7 +82,11 @@ impl HkdfExpander for DummyHkdfExpander {
             }
         }
 
+        #[cfg(not(feature = "uncrunch"))]
         panic!("DummyHkdfExpander asked to expand unexpected ikm/info: {:x?} {}", self.ikm, hex::encode(info));
+
+        #[cfg(feature = "uncrunch")]
+        hkdf::Hkdf::<Sha256>::from_prk(&self.ikm.as_bytes()).or(Err(())).and_then(|x| x.expand(&info, output).or(Err(()))).or_else(|_| Err(OutputLengthError))
     }
 
     fn expand_block(&self, info: &[&[u8]]) -> OkmBlock {

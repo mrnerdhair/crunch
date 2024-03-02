@@ -14,7 +14,7 @@ impl SupportedKxGroup for DummySupportedKxGroup {
     fn name(&self) -> NamedGroup { self.named_group }
 
     fn start(&self) -> Result<Box<dyn ActiveKeyExchange>, rustls::Error> {
-        let pubkey = self.pubkey.upgrade().ok_or(rustls::Error::General("DummySupportedKxGroup pubkey not available".to_string()))?;
+        let pubkey = self.pubkey.upgrade().expect("DummySupportedKxGroup pubkey not available");
         Ok(Box::new(DummyActiveKeyExchange::new(self.named_group, (*pubkey).as_ref())))
     }
 }
