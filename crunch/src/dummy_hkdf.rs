@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use rustls::crypto::{hmac, tls13::{Hkdf, HkdfExpander, OkmBlock}, ActiveKeyExchange};
 
-use crate::{dummy_crypto_provider::DUMMY_ECDHE_SHARED_SECRET, dummy_hkdf_expander::{DummyHkdfExpander, DummyHkdfExpanderValue, DummyHkdfIkm}};
+use crate::{dummy_crypto_provider::{DUMMY_ECDHE_SHARED_SECRET, DUMMY_TLS13_CLIENT_FINISHED_KEY, DUMMY_TLS13_SERVER_FINISHED_KEY}, dummy_hkdf_expander::{DummyHkdfExpander, DummyHkdfExpanderValue, DummyHkdfIkm}};
 
 #[derive(Debug, Default)]
 pub struct DummyHkdf {
@@ -30,10 +30,12 @@ impl Hkdf for DummyHkdf {
     }
 
     fn hmac_sign(&self, key: &OkmBlock, message: &[u8]) -> hmac::Tag {
-        println!("hmac_sign: {} {}", hex::encode(key.as_ref()), hex::encode(message));
-        hmac::Tag::new(&hex::decode("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718").unwrap())
-        // todo!()
-        // self.hmac.with_key(key.as_ref()).sign(&[message])
+        let key: &[u8; 32] = key.as_ref().try_into().unwrap();
+        match key {
+            &DUMMY_TLS13_SERVER_FINISHED_KEY => hmac::Tag::new(&hex::decode("9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718").unwrap()),
+            &DUMMY_TLS13_CLIENT_FINISHED_KEY => hmac::Tag::new(&hex::decode("a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2edd5ce61").unwrap()),
+            _ => panic!("DummyHkdf asked to hmac_sign {} with unexpected key {}", hex::encode(message), hex::encode(key.as_ref())),
+        }
     }
 
     fn extract_from_kx_shared_secret(

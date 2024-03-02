@@ -85,6 +85,8 @@ impl MessageEncrypter for AeadAes128GcmMessageEncrypter {
         let mut buffer = msg.payload.to_vec();
         buffer.extend_from_slice(&[msg.typ.get_u8()]);
 
+        eprintln!("encrypting {}", hex::encode(&buffer));
+
         let associated_data = make_tls13_aad(buffer.len() + 16);
 
         aes_gcm::Aes128Gcm::new(&self.key.into()).encrypt_in_place(&nonce.into(), &associated_data, &mut buffer).map_err(|_| rustls::Error::EncryptError)?;
