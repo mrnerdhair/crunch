@@ -1,3 +1,9 @@
 [submodule "rustls"]
 	path = rustls
 	url = https://github.com/mrnerdhair/rustls
+[submodule "tls_garble"]
+	path = tls_garble
+	url = https://github.com/mrnerdhair/tls_garble
+[submodule "MP-SPDZ"]
+	path = MP-SPDZ
+	url = https://github.com/mrnerdhair/MP-SPDZ
