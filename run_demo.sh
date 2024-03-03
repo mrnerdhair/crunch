@@ -1,4 +1,5 @@
 #!/bin/bash
+git submodule update --init --recursive
 clear
 pushd MP-SPDZ
 ./do_mpc.sh
