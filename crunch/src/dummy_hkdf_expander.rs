@@ -4,7 +4,7 @@ use rustls::crypto::{hmac::Hmac, tls13::{HkdfExpander, OkmBlock, OutputLengthErr
 #[cfg(feature = "uncrunch")]
 use sha2::Sha256;
 
-use crate::hmac_sha256::HmacSha256;
+use crate::{hash_reporter::HashReporters, hmac_sha256::HmacSha256};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DummyHkdfIkm {
@@ -61,8 +61,7 @@ impl DummyHkdfExpanderValue {
 pub struct DummyHkdfExpander {
     ikm: DummyHkdfIkm,
     values: Arc<RwLock<Vec<DummyHkdfExpanderValue>>>,
-    ch_sh_transcript_hash_reporter: Arc<OnceLock<[u8; 32]>>,
-    ch_sf_transcript_hash_reporter: Arc<OnceLock<[u8; 32]>>,
+    hash_reporters: HashReporters,
 }
 
 fn collect_info(info: &[&[u8]]) -> Vec<u8> {
@@ -88,11 +87,11 @@ impl HkdfExpander for DummyHkdfExpander {
         eprintln!("DummyHkdfExpander expanding ikm/info: {:x?} {}", self.ikm, hex::encode(&info));
 
         if info.len() == 54 && &info[11..21] == b"hs traffic" {
-            let _ = self.ch_sh_transcript_hash_reporter.set(info[22..].try_into().unwrap());
+            let _ = self.hash_reporters.report_ch_sh_transcript_hash(info[22..].try_into().unwrap());
         }
 
         if info.len() == 54 && &info[11..21] == b"ap traffic" {
-            let _ = self.ch_sf_transcript_hash_reporter.set(info[22..].try_into().unwrap());
+            let _ = self.hash_reporters.report_ch_sf_transcript_hash(info[22..].try_into().unwrap());
         }
 
         #[cfg(not(feature = "uncrunch"))]
@@ -112,14 +111,11 @@ impl HkdfExpander for DummyHkdfExpander {
 }
 
 impl<'a> DummyHkdfExpander {
-    pub fn new(ikm: DummyHkdfIkm, values: &Arc<RwLock<Vec<DummyHkdfExpanderValue>>>, ch_sh_transcript_hash_reporter: &Arc<OnceLock<[u8; 32]>>, ch_sf_transcript_hash_reporter: &Arc<OnceLock<[u8; 32]>>) -> Self {
-        let out = Self {
+    pub fn new(ikm: DummyHkdfIkm, values: &Arc<RwLock<Vec<DummyHkdfExpanderValue>>>, hash_reporters: &HashReporters) -> Self {
+        Self {
             ikm,
             values: Arc::clone(values),
-            ch_sh_transcript_hash_reporter: Arc::clone(ch_sh_transcript_hash_reporter),
-            ch_sf_transcript_hash_reporter: Arc::clone(ch_sf_transcript_hash_reporter),
-        };
-
-        out
+            hash_reporters: hash_reporters.clone(),
+        }
     }
 }

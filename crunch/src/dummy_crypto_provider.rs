@@ -1,9 +1,9 @@
-use std::{sync::{Arc, OnceLock, RwLock}, vec};
+use std::{borrow::{Borrow, BorrowMut}, fmt::Debug, sync::{atomic::{AtomicU64, AtomicU8}, Arc, OnceLock, RwLock, RwLockWriteGuard}, vec};
 
-use rustls::{crypto::{hmac::Hmac, CipherSuiteCommon, CryptoProvider, SupportedKxGroup, WebPkiSupportedAlgorithms}, CipherSuite, NamedGroup, SupportedCipherSuite, Tls13CipherSuite};
+use rustls::{crypto::{hash::Hash, hmac::Hmac, CipherSuiteCommon, CryptoProvider, SupportedKxGroup, WebPkiSupportedAlgorithms}, CipherSuite, NamedGroup, SupportedCipherSuite, Tls13CipherSuite};
 use sha2::Sha256;
 
-use crate::{aead_aes_128_gcm::AeadAes128Gcm, dummy_hkdf::DummyHkdf, dummy_hkdf_expander::{DummyHkdfExpanderValue, DummyHkdfIkm}, dummy_key_provider::DummyKeyProvider, dummy_secure_random::DummySecureRandom, dummy_supported_kx_group::DummySupportedKxGroup, hash_sha256::HashSha256, hmac_sha256, secret_to_key_and_iv, verify};
+use crate::{aead_aes_128_gcm::AeadAes128Gcm, dummy_hkdf::DummyHkdf, dummy_hkdf_expander::{DummyHkdfExpanderValue, DummyHkdfIkm}, dummy_key_provider::DummyKeyProvider, dummy_secure_random::DummySecureRandom, dummy_supported_kx_group::DummySupportedKxGroup, hash_reporter::HashReporters, hash_sha256::HashSha256, hmac_sha256, verify};
 
 pub const DUMMY_ECDHE_SHARED_SECRET: [u8; 32] = *b"ECDHE_SHARED_SECRET\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
 pub const DUMMY_HANDSHAKE_SECRET_IKM: [u8; 32] = *b"HANDSHAKE_SECRET_IKM\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
@@ -37,6 +37,28 @@ pub const INFO_TLS13_IV: [u8; 12] = *b"\x00\x0c\x08\x74\x6c\x73\x31\x33\x20\x69\
 pub const INFO_TLS13_FINISHED: [u8; 18] = *b"\x00\x20\x0e\x74\x6c\x73\x31\x33\x20\x66\x69\x6e\x69\x73\x68\x65\x64\x00";
 pub const INFO_TLS13_RESUMPTION: [u8; 22] = *b"\x00\x20\x10\x74\x6c\x73\x31\x33\x20\x72\x65\x73\x75\x6d\x70\x74\x69\x6f\x6e\x02\x00\x00";
 
+
+pub fn hkdf_expand_with_info<const T: usize>(secret: [u8; 32], info: &[u8]) -> [u8; T] {
+    let mut key = [0u8; T];
+    hkdf::Hkdf::<Sha256>::from_prk(&secret).unwrap().expand(&info, &mut key).unwrap();
+    key
+}
+
+pub fn secret_to_key_and_iv(secret: [u8; 32]) -> ([u8; 16], [u8; 12]) {
+    (
+        hkdf_expand_with_info::<16>(secret, &INFO_TLS13_KEY),
+        hkdf_expand_with_info::<12>(secret, &INFO_TLS13_IV),
+    )
+}
+
+#[test]
+fn test_secret_to_key_and_iv() {
+    assert_eq!(
+        (hex::decode("dbfaa693d1762c5b666af5d950258d01").unwrap().try_into().unwrap(), hex::decode("5bd3c71b836e0b76bb73265f").unwrap().try_into().unwrap()),
+        secret_to_key_and_iv(hex::decode("b3eddb126e067f35a780b3abf45e2d8f3b1a950738f52e9600746a0e27a55a21").unwrap().try_into().unwrap()),
+    );
+}
+
 pub struct DummyCryptoProvider {
     signature_verification_algorithms: WebPkiSupportedAlgorithms,
     dummy_secure_random: DummySecureRandom,
@@ -68,24 +90,27 @@ pub struct DummyKeys {
 }
 
 impl DummyKeys {
-    pub fn set_c_hs_secret(&self, secret: [u8; 32], transcript_hash: [u8; 32]) {
+    pub fn set_c_hs_secret(&self, secret: [u8; 32]) {
+        println!("set_c_hs_secret: {}", hex::encode(&secret));
+
         let (key, iv) = secret_to_key_and_iv(secret);
         self.client_hs_traffic_key.set(key.to_vec()).unwrap();
         self.client_hs_traffic_iv.set(iv.to_vec()).unwrap();
 
-        // let mut finished_key = [0u8; 32];
-        // hkdf::Hkdf::<Sha256>::from_prk(&secret).unwrap().expand(&INFO_TLS13_FINISHED, &mut finished_key).unwrap();
-        // self.client_finished_key.set(hmac_sha256::HmacSha256.with_key(&finished_key).sign(&[&transcript_hash]).as_ref().to_vec()).unwrap();
+        let finished_key = hkdf_expand_with_info::<32>(secret, &INFO_TLS13_FINISHED);
+        println!("client finished key {} from {}", hex::encode(&finished_key), hex::encode(&secret));
+        self.client_finished_key.set(finished_key.to_vec()).unwrap();
     }
 
-    pub fn set_s_hs_secret(&self, secret: [u8; 32], transcript_hash: [u8; 32]) {
+    pub fn set_s_hs_secret(&self, secret: [u8; 32]) {
+        println!("set_s_hs_secret: {}", hex::encode(&secret));
         let (key, iv) = secret_to_key_and_iv(secret);
         self.server_hs_traffic_key.set(key.to_vec()).unwrap();
         self.server_hs_traffic_iv.set(iv.to_vec()).unwrap();
 
-        // let mut finished_key = [0u8; 32];
-        // hkdf::Hkdf::<Sha256>::from_prk(&secret).unwrap().expand(&INFO_TLS13_FINISHED, &mut finished_key).unwrap();
-        // self.server_finished_key.set(hmac_sha256::HmacSha256.with_key(&finished_key).sign(&[&transcript_hash]).as_ref().to_vec()).unwrap();
+        let finished_key = hkdf_expand_with_info::<32>(secret, &INFO_TLS13_FINISHED);
+        println!("server finished key {} from {}", hex::encode(&finished_key), hex::encode(&secret));
+        self.server_finished_key.set(finished_key.to_vec()).unwrap();
     }
 
     pub fn set_c_ap_secret(&self, secret: [u8; 32]) {
@@ -104,11 +129,12 @@ impl DummyKeys {
 pub struct DummyCryptoProviderParams {
     pub dummy_random_data: Arc<RwLock<Vec<u8>>>,
     pub dummy_pubkey: Arc<Vec<u8>>,
+
+    pub hash_reporters: HashReporters,
+
+    #[cfg(feature = "uncrunch")]
     pub shared_secret: Vec<u8>,
 
-    pub ch_sh_transcript_hash_reporter: Arc<OnceLock<[u8; 32]>>,
-    pub ch_sf_transcript_hash_reporter: Arc<OnceLock<[u8; 32]>>,
-    
     #[cfg(not(feature = "uncrunch"))]
     pub dummy_keys: Arc<DummyKeys>,
 }
@@ -118,9 +144,9 @@ impl DummyCryptoProvider {
         let params = Box::leak(Box::new(params));
 
         #[cfg(not(feature = "uncrunch"))]
-        let mut dummy_hkdf = DummyHkdf::new(&params.shared_secret, &params.ch_sh_transcript_hash_reporter, &params.ch_sf_transcript_hash_reporter, &params.dummy_keys);
+        let mut dummy_hkdf = DummyHkdf::new(&DUMMY_ECDHE_SHARED_SECRET, &params.hash_reporters, &params.dummy_keys);
         #[cfg(feature = "uncrunch")]
-        let mut dummy_hkdf = DummyHkdf::new(&params.shared_secret, &params.ch_sh_transcript_hash_reporter, &params.ch_sf_transcript_hash_reporter);
+        let mut dummy_hkdf = DummyHkdf::new(&params.shared_secret, &params.hash_reporters);
 
         #[cfg(not(feature = "uncrunch"))]
         dummy_hkdf.add_value(DummyHkdfExpanderValue::new(
@@ -316,7 +342,7 @@ impl DummyCryptoProvider {
                 #[cfg(feature = "rfc8448")]
                 DummySupportedKxGroup::new(NamedGroup::FFDHE8192, &params.dummy_pubkey),
             ],
-            hash_sha256: HashSha256::default(),
+            hash_sha256: HashSha256::new(params.hash_reporters.clone()),
             dummy_hkdf,
             #[cfg(not(feature = "uncrunch"))]
             aead_aes_128_gcm: AeadAes128Gcm::new(Arc::clone(&params.dummy_keys)),
